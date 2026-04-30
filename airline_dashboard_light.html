@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Airline Sentiment Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:       #f5f6f8;
+    --white:    #ffffff;
+    --gray-50:  #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-700: #374151;
+    --gray-900: #111827;
+
+    --neg:      #e74c3c;
+    --neg-soft: #fef2f2;
+    --neg-mid:  #fecaca;
+    --pos:      #22a06b;
+    --pos-soft: #f0fdf7;
+    --pos-mid:  #a7f3d0;
+    --neu:      #6b7280;
+    --blue:     #3b82f6;
+    --blue-soft:#eff6ff;
+    --gold:     #d97706;
+    --gold-soft:#fffbeb;
+
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow:    0 4px 12px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.04);
+    --radius:    12px;
+    --radius-sm: 8px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--gray-900);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .dashboard {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 28px 28px 40px;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .logo {
+    width: 40px; height: 40px;
+    background: var(--gray-900);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; color: white;
+    flex-shrink: 0;
+  }
+  .header-title h1 {
+    font-size: 1.15rem; font-weight: 600; color: var(--gray-900); letter-spacing: -0.01em;
+  }
+  .header-title p { font-size: 0.75rem; color: var(--gray-400); margin-top: 2px; font-family: 'DM Mono', monospace; }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .tag {
+    font-size: 0.7rem; font-family: 'DM Mono', monospace;
+    padding: 5px 12px; border-radius: 20px;
+    background: var(--white); border: 1px solid var(--gray-200);
+    color: var(--gray-500);
+  }
+  .tag.active { background: var(--gray-900); color: white; border-color: var(--gray-900); }
+
+  /* ── CARD BASE ── */
+  .card {
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    padding: 20px;
+    transition: box-shadow 0.2s;
+  }
+  .card:hover { box-shadow: var(--shadow); }
+  .card-label {
+    font-size: 0.67rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--gray-400); margin-bottom: 14px;
+  }
+
+  /* ── KPI GRID ── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .kpi {
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-sm);
+    padding: 16px 14px;
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0; height: 3px;
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  }
+  .kpi.kpi-blue::after  { background: #3b82f6; }
+  .kpi.kpi-red::after   { background: var(--neg); }
+  .kpi.kpi-green::after { background: var(--pos); }
+  .kpi.kpi-gray::after  { background: var(--gray-400); }
+  .kpi.kpi-gold::after  { background: var(--gold); }
+
+  .kpi-lbl { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gray-400); margin-bottom: 8px; }
+  .kpi-val { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1; color: var(--gray-900); }
+  .kpi-val.red   { color: var(--neg); }
+  .kpi-val.green { color: var(--pos); }
+  .kpi-val.blue  { color: var(--blue); }
+  .kpi-val.gold  { color: var(--gold); }
+  .kpi-sub { font-size: 0.67rem; color: var(--gray-400); margin-top: 5px; font-family: 'DM Mono', monospace; }
+
+  /* ── MAIN GRID ── */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+  .bottom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  /* ── LEADERBOARD ── */
+  .lb-header {
+    display: grid;
+    grid-template-columns: 130px 1fr 72px 72px 52px;
+    gap: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--gray-100);
+    margin-bottom: 6px;
+  }
+  .lb-header span { font-size: 0.62rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gray-400); }
+  .lb-row {
+    display: grid;
+    grid-template-columns: 130px 1fr 72px 72px 52px;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--gray-50);
+    transition: background 0.15s;
+    border-radius: 6px;
+    cursor: default;
+  }
+  .lb-row:last-child { border-bottom: none; }
+  .lb-row:hover { background: var(--gray-50); padding-left: 6px; padding-right: 6px; }
+  .lb-name { font-size: 0.82rem; font-weight: 600; color: var(--gray-900); }
+  .track { background: var(--gray-100); border-radius: 4px; height: 6px; overflow: hidden; }
+  .fill  { height: 100%; border-radius: 4px; }
+  .mono  { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--gray-500); text-align: right; }
+  .mono.strong { font-weight: 500; color: var(--gray-700); }
+  .rank-pill {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 22px; border-radius: 6px;
+    font-family: 'DM Mono', monospace; font-size: 0.7rem; font-weight: 600;
+  }
+  .r1 { background: #fef3c7; color: #92400e; }
+  .r2 { background: #f0f9ff; color: #1e40af; }
+  .r3 { background: #f5f3ff; color: #5b21b6; }
+  .rn { background: var(--neg-soft); color: #991b1b; }
+
+  /* ── DONUT ── */
+  .donut-wrap { position: relative; max-width: 180px; margin: 0 auto; }
+  .donut-center {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    text-align: center;
+  }
+  .donut-center .big  { font-size: 1.5rem; font-weight: 700; color: var(--neg); letter-spacing: -0.03em; }
+  .donut-center .lbl  { font-size: 0.62rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gray-400); }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 16px; margin-top: 14px; justify-content: center; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; color: var(--gray-500); }
+  .ldot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ── REASON BARS ── */
+  .reason-list { display: flex; flex-direction: column; gap: 11px; }
+  .reason-meta { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+  .reason-name { font-size: 0.78rem; font-weight: 500; color: var(--gray-700); }
+  .reason-pct  { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--gray-400); }
+
+  /* ── TOPIC TILES ── */
+  .topic-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .topic-tile {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-sm);
+    padding: 11px 12px;
+    transition: border-color 0.15s, background 0.15s;
+    cursor: default;
+  }
+  .topic-tile:hover { background: var(--white); border-color: var(--gray-300); }
+  .topic-name { font-size: 0.7rem; font-weight: 600; color: var(--gray-500); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .topic-rate { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.02em; }
+  .topic-bar  { background: var(--gray-200); border-radius: 3px; height: 3px; margin-top: 6px; overflow: hidden; }
+  .topic-fill { height: 100%; border-radius: 3px; }
+
+  /* ── VADER / RETWEET ── */
+  .score-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--gray-50); }
+  .score-row:last-child { border-bottom: none; }
+  .score-name { font-size: 0.78rem; font-weight: 500; width: 110px; flex-shrink: 0; color: var(--gray-700); }
+  .score-track { flex: 1; background: var(--gray-100); border-radius: 4px; height: 7px; overflow: hidden; }
+  .score-fill  { height: 100%; border-radius: 4px; }
+  .score-val   { font-family: 'DM Mono', monospace; font-size: 0.72rem; width: 48px; text-align: right; flex-shrink: 0; color: var(--gray-500); }
+
+  /* ── SECTION DIVIDER ── */
+  .section-title {
+    font-size: 0.67rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--gray-400); margin: 20px 0 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--gray-200); }
+
+  /* ── TREND CHART WRAPPER ── */
+  .trend-card { grid-column: 1 / -1; }
+
+  /* ── FOOTER ── */
+  .footer {
+    text-align: center; margin-top: 28px;
+    font-size: 0.67rem; color: var(--gray-300); font-family: 'DM Mono', monospace;
+  }
+
+  /* ── ANIMATIONS ── */
+  .card, .kpi { animation: rise 0.35s both; }
+  @keyframes rise { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+  .kpi:nth-child(2){animation-delay:.04s} .kpi:nth-child(3){animation-delay:.08s}
+  .kpi:nth-child(4){animation-delay:.12s} .kpi:nth-child(5){animation-delay:.16s}
+  .kpi:nth-child(6){animation-delay:.20s} .kpi:nth-child(7){animation-delay:.24s}
+  .kpi:nth-child(8){animation-delay:.28s}
+</style>
+</head>
+<body>
+<div class="dashboard">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <div class="logo">✈</div>
+      <div class="header-title">
+        <h1>Airline Sentiment Dashboard</h1>
+        <p>Twitter · Feb 16–24, 2015 · 14,610 tweets · 6 airlines</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="tag">Q1 2015</div>
+      <div class="tag active">Live Report</div>
+    </div>
+  </div>
+
+  <!-- KPI ROW -->
+  <div class="kpi-grid">
+    <div class="kpi kpi-blue">
+      <div class="kpi-lbl">Total Tweets</div>
+      <div class="kpi-val blue">14,610</div>
+      <div class="kpi-sub">6 airlines</div>
+    </div>
+    <div class="kpi kpi-red">
+      <div class="kpi-lbl">Negative Rate</div>
+      <div class="kpi-val red">62.8%</div>
+      <div class="kpi-sub">9,173 tweets</div>
+    </div>
+    <div class="kpi kpi-green">
+      <div class="kpi-lbl">Positive Rate</div>
+      <div class="kpi-val green">16.1%</div>
+      <div class="kpi-sub">2,352 tweets</div>
+    </div>
+    <div class="kpi kpi-gray">
+      <div class="kpi-lbl">Neutral Rate</div>
+      <div class="kpi-val">21.1%</div>
+      <div class="kpi-sub">3,085 tweets</div>
+    </div>
+    <div class="kpi kpi-gray">
+      <div class="kpi-lbl">Avg VADER</div>
+      <div class="kpi-val">+0.068</div>
+      <div class="kpi-sub">Weak positive</div>
+    </div>
+    <div class="kpi kpi-gold">
+      <div class="kpi-lbl">Best Airline</div>
+      <div class="kpi-val gold" style="font-size:1rem;margin-top:2px">Virgin America</div>
+      <div class="kpi-sub">36.0% neg</div>
+    </div>
+    <div class="kpi kpi-red">
+      <div class="kpi-lbl">Worst Airline</div>
+      <div class="kpi-val red" style="font-size:1rem;margin-top:2px">US Airways</div>
+      <div class="kpi-sub">77.7% neg</div>
+    </div>
+    <div class="kpi kpi-red">
+      <div class="kpi-lbl">Top Complaint</div>
+      <div class="kpi-val" style="font-size:0.88rem;margin-top:2px;color:var(--gray-900)">Customer Service</div>
+      <div class="kpi-sub">31.7% of negatives</div>
+    </div>
+  </div>
+
+  <!-- MAIN GRID -->
+  <div class="section-title">Airline Performance</div>
+  <div class="main-grid">
+
+    <!-- Leaderboard -->
+    <div class="card">
+      <div class="card-label">Airline Sentiment Leaderboard — Ranked by VADER Score</div>
+      <div class="lb-header">
+        <span>Airline</span><span>Negative Rate</span><span>Neg %</span><span>VADER</span><span>Rank</span>
+      </div>
+
+      <div class="lb-row">
+        <div class="lb-name" style="color:var(--gold)">Virgin America</div>
+        <div class="track"><div class="fill" style="width:36%;background:#22a06b"></div></div>
+        <div class="mono strong" style="color:var(--pos)">36.0%</div>
+        <div class="mono strong" style="color:var(--pos)">+0.160</div>
+        <div class="rank-pill r1">1</div>
+      </div>
+      <div class="lb-row">
+        <div class="lb-name">Southwest</div>
+        <div class="track"><div class="fill" style="width:49.2%;background:#3b82f6"></div></div>
+        <div class="mono strong" style="color:var(--blue)">49.2%</div>
+        <div class="mono strong" style="color:var(--blue)">+0.150</div>
+        <div class="rank-pill r2">2</div>
+      </div>
+      <div class="lb-row">
+        <div class="lb-name">Delta</div>
+        <div class="track"><div class="fill" style="width:43.1%;background:#7c3aed"></div></div>
+        <div class="mono strong" style="color:#7c3aed">43.1%</div>
+        <div class="mono strong" style="color:#7c3aed">+0.130</div>
+        <div class="rank-pill r3">3</div>
+      </div>
+      <div class="lb-row">
+        <div class="lb-name">United</div>
+        <div class="track"><div class="fill" style="width:68.9%;background:#f97316"></div></div>
+        <div class="mono strong" style="color:#f97316">68.9%</div>
+        <div class="mono strong" style="color:#f97316">+0.050</div>
+        <div class="rank-pill rn">4</div>
+      </div>
+      <div class="lb-row">
+        <div class="lb-name">American</div>
+        <div class="track"><div class="fill" style="width:71.2%;background:#ef4444"></div></div>
+        <div class="mono strong" style="color:var(--neg)">71.2%</div>
+        <div class="mono strong" style="color:var(--neg)">+0.030</div>
+        <div class="rank-pill rn">5</div>
+      </div>
+      <div class="lb-row">
+        <div class="lb-name" style="color:var(--neg)">US Airways</div>
+        <div class="track"><div class="fill" style="width:77.7%;background:#b91c1c"></div></div>
+        <div class="mono strong" style="color:#b91c1c">77.7%</div>
+        <div class="mono strong" style="color:#b91c1c">+0.000</div>
+        <div class="rank-pill rn">6</div>
+      </div>
+    </div>
+
+    <!-- Sentiment donut -->
+    <div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center">
+      <div class="card-label" style="text-align:center;width:100%">Overall Sentiment Split</div>
+      <div class="donut-wrap">
+        <canvas id="donut" width="180" height="180"></canvas>
+        <div class="donut-center">
+          <div class="big">62.8%</div>
+          <div class="lbl">Negative</div>
+        </div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><div class="ldot" style="background:#ef4444"></div>Negative 62.8%</div>
+        <div class="legend-item"><div class="ldot" style="background:#9ca3af"></div>Neutral 21.1%</div>
+        <div class="legend-item"><div class="ldot" style="background:#22a06b"></div>Positive 16.1%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM GRID -->
+  <div class="section-title">Root Cause & Topic Breakdown</div>
+  <div class="bottom-grid">
+
+    <!-- Complaint reasons -->
+    <div class="card">
+      <div class="card-label">Top Negative Complaint Reasons</div>
+      <div class="reason-list">
+        <div>
+          <div class="reason-meta"><span class="reason-name">Customer Service Issue</span><span class="reason-pct">2,909 · 31.7%</span></div>
+          <div class="track" style="height:7px"><div class="fill" style="width:100%;background:#b91c1c"></div></div>
+        </div>
+        <div>
+          <div class="reason-meta"><span class="reason-name">Late Flight</span><span class="reason-pct">1,665 · 18.2%</span></div>
+          <div class="track" style="height:7px"><div class="fill" style="width:57%;background:#dc2626"></div></div>
+        </div>
+        <div>
+          <div class="reason-meta"><span class="reason-name">Can't Tell</span><span class="reason-pct">1,187 · 12.9%</span></div>
+          <div class="track" style="height:7px"><div class="fill" style="width:41%;background:#ef4444"></div></div>
+        </div>
+        <div>
+          <div class="reason-meta"><span class="reason-name">Cancelled Flight</span><span class="reason-pct">846 · 9.2%</span></div>
+          <div class="track" style="height:7px"><div class="fill" style="width:29%;background:#f97316"></div></div>
+        </div>
+        <div>
+          <div class="reason-meta"><span class="reason-name">Lost Luggage</span><span class="reason-pct">724 · 7.9%</span></div>
+          <div class="track" style="height:7px"><div class="fill" style="width:25%;background:#f59e0b"></div></div>
+        </div>
+        <div>
+          <div class="reason-meta"><span class="reason-name">Bad Flight</span><span class="reason-pct">580 · 6.3%</span></div>
+          <div class="track" style="height:7px"><div class="fill" style="width:20%;background:#84cc16"></div></div>
+        </div>
+        <div>
+          <div class="reason-meta"><span class="reason-name">Flight Booking Problems</span><span class="reason-pct">529 · 5.8%</span></div>
+          <div class="track" style="height:7px"><div class="fill" style="width:18%;background:#3b82f6"></div></div>
+        </div>
+        <div>
+          <div class="reason-meta"><span class="reason-name">Flight Attendant Issues</span><span class="reason-pct">481 · 5.2%</span></div>
+          <div class="track" style="height:7px"><div class="fill" style="width:16%;background:#8b5cf6"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Topic tiles -->
+    <div class="card">
+      <div class="card-label">Business Topic — Negative Rate</div>
+      <div class="topic-grid">
+        <div class="topic-tile">
+          <div class="topic-name">Flight Delay</div>
+          <div class="topic-rate" style="color:#b91c1c">84.4%</div>
+          <div class="topic-bar"><div class="topic-fill" style="width:84%;background:#b91c1c"></div></div>
+        </div>
+        <div class="topic-tile">
+          <div class="topic-name">Cancellation</div>
+          <div class="topic-rate" style="color:#dc2626">83.8%</div>
+          <div class="topic-bar"><div class="topic-fill" style="width:83%;background:#dc2626"></div></div>
+        </div>
+        <div class="topic-tile">
+          <div class="topic-name">Baggage</div>
+          <div class="topic-rate" style="color:#ef4444">80.8%</div>
+          <div class="topic-bar"><div class="topic-fill" style="width:80%;background:#ef4444"></div></div>
+        </div>
+        <div class="topic-tile">
+          <div class="topic-name">Customer Svc</div>
+          <div class="topic-rate" style="color:#f97316">69.7%</div>
+          <div class="topic-bar"><div class="topic-fill" style="width:69%;background:#f97316"></div></div>
+        </div>
+        <div class="topic-tile">
+          <div class="topic-name">Flight Exp.</div>
+          <div class="topic-rate" style="color:#f59e0b">58.2%</div>
+          <div class="topic-bar"><div class="topic-fill" style="width:58%;background:#f59e0b"></div></div>
+        </div>
+        <div class="topic-tile">
+          <div class="topic-name">Booking & Web</div>
+          <div class="topic-rate" style="color:#3b82f6">56.9%</div>
+          <div class="topic-bar"><div class="topic-fill" style="width:57%;background:#3b82f6"></div></div>
+        </div>
+        <div class="topic-tile">
+          <div class="topic-name">Other</div>
+          <div class="topic-rate" style="color:var(--gray-500)">50.2%</div>
+          <div class="topic-bar"><div class="topic-fill" style="width:50%;background:var(--gray-400)"></div></div>
+        </div>
+        <div class="topic-tile">
+          <div class="topic-name">Positive Exp.</div>
+          <div class="topic-rate" style="color:var(--pos)">16.8%</div>
+          <div class="topic-bar"><div class="topic-fill" style="width:17%;background:var(--pos)"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VADER + Retweets -->
+    <div class="card">
+      <div class="card-label" style="margin-bottom:10px">VADER Score by Airline</div>
+      <div class="score-row">
+        <div class="score-name" style="color:var(--gold)">Virgin America</div>
+        <div class="score-track"><div class="score-fill" style="width:100%;background:#f59e0b"></div></div>
+        <div class="score-val" style="color:var(--gold)">+0.160</div>
+      </div>
+      <div class="score-row">
+        <div class="score-name">Southwest</div>
+        <div class="score-track"><div class="score-fill" style="width:93.75%;background:#3b82f6"></div></div>
+        <div class="score-val" style="color:#3b82f6">+0.150</div>
+      </div>
+      <div class="score-row">
+        <div class="score-name">Delta</div>
+        <div class="score-track"><div class="score-fill" style="width:81.25%;background:#7c3aed"></div></div>
+        <div class="score-val" style="color:#7c3aed">+0.130</div>
+      </div>
+      <div class="score-row">
+        <div class="score-name">United</div>
+        <div class="score-track"><div class="score-fill" style="width:31.25%;background:#f97316"></div></div>
+        <div class="score-val" style="color:#f97316">+0.050</div>
+      </div>
+      <div class="score-row">
+        <div class="score-name">American</div>
+        <div class="score-track"><div class="score-fill" style="width:18.75%;background:#ef4444"></div></div>
+        <div class="score-val" style="color:#ef4444">+0.030</div>
+      </div>
+      <div class="score-row" style="margin-bottom:20px">
+        <div class="score-name" style="color:var(--neg)">US Airways</div>
+        <div class="score-track"><div class="score-fill" style="width:2%;background:#b91c1c"></div></div>
+        <div class="score-val" style="color:#b91c1c">+0.000</div>
+      </div>
+
+      <div class="card-label" style="margin-top:4px">Total Retweets</div>
+      <div class="score-row">
+        <div class="score-name">United</div>
+        <div class="score-track"><div class="score-fill" style="width:100%;background:#3b82f6"></div></div>
+        <div class="score-val">421</div>
+      </div>
+      <div class="score-row">
+        <div class="score-name">Delta</div>
+        <div class="score-track"><div class="score-fill" style="width:59.8%;background:#7c3aed"></div></div>
+        <div class="score-val">252</div>
+      </div>
+      <div class="score-row">
+        <div class="score-name">US Airways</div>
+        <div class="score-track"><div class="score-fill" style="width:59.1%;background:#ef4444"></div></div>
+        <div class="score-val">249</div>
+      </div>
+      <div class="score-row">
+        <div class="score-name">Southwest</div>
+        <div class="score-track"><div class="score-fill" style="width:34.4%;background:#22a06b"></div></div>
+        <div class="score-val">145</div>
+      </div>
+      <div class="score-row">
+        <div class="score-name">American</div>
+        <div class="score-track"><div class="score-fill" style="width:27.7%;background:#f97316"></div></div>
+        <div class="score-val">117</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TREND CHART -->
+  <div class="section-title">Time Trend</div>
+  <div class="card trend-card">
+    <div class="card-label">Daily Tweet Volume & Sentiment — Feb 16–24, 2015</div>
+    <canvas id="trend" height="80"></canvas>
+    <div class="legend" style="margin-top:12px">
+      <div class="legend-item"><div class="ldot" style="background:#fca5a5"></div>Negative</div>
+      <div class="legend-item"><div class="ldot" style="background:#d1d5db"></div>Neutral</div>
+      <div class="legend-item"><div class="ldot" style="background:#6ee7b7"></div>Positive</div>
+    </div>
+  </div>
+
+  <!-- NEGATIVE RATE BAR -->
+  <div class="section-title">Airline Comparison</div>
+  <div class="card">
+    <div class="card-label">Negative Rate by Airline — Industry Average 57.7%</div>
+    <canvas id="airlineBar" height="65"></canvas>
+  </div>
+
+  <div class="footer">Airline Sentiment Intelligence · Twitter Airline Sentiment Dataset · Feb 2015 · VADER NLP Analysis</div>
+</div>
+
+<script>
+// ── Donut ──
+new Chart(document.getElementById('donut').getContext('2d'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Negative','Neutral','Positive'],
+    datasets: [{
+      data: [62.8, 21.1, 16.1],
+      backgroundColor: ['#ef4444','#e5e7eb','#22a06b'],
+      borderColor: '#ffffff',
+      borderWidth: 4,
+      hoverOffset: 6
+    }]
+  },
+  options: {
+    cutout: '70%',
+    plugins: { legend:{ display:false }, tooltip:{ callbacks:{ label: c => ` ${c.label}: ${c.parsed}%` }}},
+    animation: { duration:1000 }
+  }
+});
+
+// ── Trend ──
+const labels = ['Feb 16','Feb 17','Feb 18','Feb 19','Feb 20','Feb 21','Feb 22','Feb 23','Feb 24'];
+new Chart(document.getElementById('trend').getContext('2d'), {
+  type: 'bar',
+  data: {
+    labels,
+    datasets: [
+      { label:'Negative', data:[3,838,736,750,834,1049,2265,1917,781], backgroundColor:'rgba(239,68,68,0.7)', borderRadius:4, borderSkipped:false },
+      { label:'Neutral',  data:[1,294,334,327,379,277,460,672,334],    backgroundColor:'rgba(209,213,219,0.8)', borderRadius:4, borderSkipped:false },
+      { label:'Positive', data:[0,272,272,296,281,230,350,432,226],    backgroundColor:'rgba(34,160,107,0.7)', borderRadius:4, borderSkipped:false }
+    ]
+  },
+  options: {
+    responsive:true,
+    plugins:{ legend:{ display:false }, tooltip:{ mode:'index', intersect:false }},
+    scales:{
+      x:{ stacked:true, grid:{ color:'rgba(0,0,0,0.04)' }, ticks:{ color:'#9ca3af', font:{ family:'DM Mono', size:11 }}},
+      y:{ stacked:true, grid:{ color:'rgba(0,0,0,0.04)' }, ticks:{ color:'#9ca3af', font:{ family:'DM Mono', size:11 }}}
+    },
+    animation:{ duration:900 }
+  }
+});
+
+// ── Airline neg rate ──
+new Chart(document.getElementById('airlineBar').getContext('2d'), {
+  type:'bar',
+  data:{
+    labels:['Virgin America','Southwest','Delta','United','American','US Airways'],
+    datasets:[{
+      label:'Negative Rate %',
+      data:[36.0,49.2,43.1,68.9,71.2,77.7],
+      backgroundColor:['#22a06b','#3b82f6','#7c3aed','#f97316','#ef4444','#b91c1c'],
+      borderRadius:6, borderSkipped:false
+    }]
+  },
+  options:{
+    indexAxis:'y', responsive:true,
+    plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label: c => ` ${c.parsed.x}%` }}},
+    scales:{
+      x:{
+        grid:{ color:'rgba(0,0,0,0.04)' },
+        ticks:{ color:'#9ca3af', font:{ family:'DM Mono', size:11 }, callback: v => v+'%' },
+        max:90
+      },
+      y:{ grid:{ display:false }, ticks:{ color:'#374151', font:{ family:'DM Sans', size:12, weight:'500' }}}
+    },
+    animation:{ duration:900 }
+  }
+});
+</script>
+</body>
+</html>
